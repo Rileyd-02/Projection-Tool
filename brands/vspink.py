@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
-from utils import excel_to_bytes
+from ..utils.helpers import excel_to_bytes
+
 
 # ---------- Transformation ----------
 def transform_vspink_data(df):
@@ -51,3 +52,4 @@ def render():
             st.download_button("📥 Download VSPINK MCU", out_bytes, file_name="vspink_mcu.xlsx")
         except Exception as e:
             st.error(f"Error processing VSPINK file: {e}")
+
