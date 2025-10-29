@@ -1,4 +1,11 @@
+import sys, os
+sys.path.append(os.path.dirname(__file__))
+
 import streamlit as st
+from utils.helpers import excel_to_bytes
+from brands.savage import page_savage
+from brands.vspink import page_vspink
+from brands.hugoboss import page_hugoboss
 import importlib
 import pkgutil
 import brands
@@ -69,3 +76,4 @@ else:
         if mod.name == choice:
             mod.render()
             break
+
