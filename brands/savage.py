@@ -1,9 +1,11 @@
+# brands/savage.py
 import streamlit as st
 import pandas as pd
-from ..utils.helpers import excel_to_bytes
+from utils.helpers import excel_to_bytes
 
-
-# ---------- Transformations ----------
+# ----------------------------
+# Logic
+# ----------------------------
 def transform_style_units(uploaded_file):
     df = pd.read_excel(uploaded_file, header=2)
     df.columns = df.columns.str.replace(r'[\n"]+', ' ', regex=True).str.strip()
@@ -11,7 +13,7 @@ def transform_style_units(uploaded_file):
     required = ["DESIGN STYLE", "XFD", "GLOBAL UNITS"]
     missing = [c for c in required if c not in df.columns]
     if missing:
-        raise ValueError(f"Missing required columns for Savage Buy file: {missing}")
+        raise ValueError(f"Missing required columns: {missing}")
 
     df = df[required].copy()
     df["XFD_dt"] = pd.to_datetime(df["XFD"], errors="coerce", dayfirst=True)
@@ -34,25 +36,19 @@ def transform_style_units(uploaded_file):
     month_order = ["JAN","FEB","MAR","APR","MAY","JUNE","JULY","AUG","SEP","OCT","NOV","DEC"]
     non_month_cols = [c for c in pivot_df.columns if c not in month_order]
     ordered_cols = non_month_cols + [m for m in month_order if m in pivot_df.columns]
-    pivot_df = pivot_df[ordered_cols]
-    return pivot_df
-
+    return pivot_df[ordered_cols]
 
 def transform_plm_to_mcu(uploaded_file):
-    expected_sheet_names = [
-        "Fabrics", "Strip Cut", "Laces", "Embriodery/Printing",
-        "Elastics", "Tapes", "Trim/Component", "Label/ Transfer",
-        "Foam Cup", "Packing Trim"
-    ]
-    base_cols = [
-        "Sheet Names", "Season", "Style", "BOM", "Cycle", "Article",
-        "Type of Const 1", "Supplier", "UOM", "Composition",
-        "Measurement", "Supplier Country", "Avg YY"
-    ]
+    expected_sheets = ["Fabrics", "Strip Cut", "Laces", "Embriodery/Printing",
+                       "Elastics", "Tapes", "Trim/Component", "Label/ Transfer",
+                       "Foam Cup", "Packing Trim"]
+    base_cols = ["Sheet Names","Season","Style","BOM","Cycle","Article",
+                 "Type of Const 1","Supplier","UOM","Composition",
+                 "Measurement","Supplier Country","Avg YY"]
     xls = pd.ExcelFile(uploaded_file)
     collected = []
 
-    for sheet in expected_sheet_names:
+    for sheet in expected_sheets:
         if sheet in xls.sheet_names:
             df = pd.read_excel(xls, sheet_name=sheet)
             df.columns = df.columns.str.strip()
@@ -63,45 +59,36 @@ def transform_plm_to_mcu(uploaded_file):
                 if col not in df.columns:
                     df[col] = ""
             dynamic_cols = [c for c in df.columns if c not in base_cols]
-            keep_cols = base_cols + dynamic_cols
-            df = df.loc[:, keep_cols]
+            df = df[base_cols + dynamic_cols]
             collected.append(df)
 
     if not collected:
         return pd.DataFrame(columns=base_cols)
-
     combined = pd.concat(collected, ignore_index=True)
     dynamic_cols = [c for c in combined.columns if c not in base_cols]
-    final_cols = base_cols + dynamic_cols
-    combined = combined.loc[:, final_cols]
-    return combined
+    return combined[base_cols + dynamic_cols]
 
-# ---------- Streamlit UI ----------
-name = "Savage - Bucket 02"
-
-def render():
+# ----------------------------
+# Streamlit page
+# ----------------------------
+def run_page():
     st.header("Savage — Buy File → PLM Upload")
     buy_file = st.file_uploader("Upload Buy file (Savage)", type=["xlsx","xls"], key="savage_buy")
     if buy_file:
-        try:
-            df_out = transform_style_units(buy_file)
-            st.subheader("Preview — PLM Upload")
-            st.dataframe(df_out.head())
-            out_bytes = excel_to_bytes(df_out)
-            st.download_button("📥 Download PLM Upload", out_bytes, file_name="plm_upload_savage.xlsx")
-        except Exception as e:
-            st.error(f"Error processing buy file: {e}")
+        df_out = transform_style_units(buy_file)
+        st.subheader("Preview — PLM Upload")
+        st.dataframe(df_out.head())
+        out_bytes = excel_to_bytes(df_out, "PLM Upload")
+        st.download_button("📥 Download PLM Upload", out_bytes, "plm_upload_savage.xlsx",
+                           "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
     st.markdown("---")
     st.header("Savage — PLM Download → MCU")
     plm_file = st.file_uploader("Upload PLM Download file (Savage)", type=["xlsx","xls"], key="savage_plm")
     if plm_file:
-        try:
-            mcu = transform_plm_to_mcu(plm_file)
-            st.subheader("Preview — MCU Combined")
-            st.dataframe(mcu.head())
-            out_bytes = excel_to_bytes(mcu)
-            st.download_button("📥 Download MCU", out_bytes, file_name="MCU_savage.xlsx")
-        except Exception as e:
-            st.error(f"Error processing PLM download file: {e}")
-
+        mcu = transform_plm_to_mcu(plm_file)
+        st.subheader("Preview — MCU Combined")
+        st.dataframe(mcu.head())
+        out_bytes = excel_to_bytes(mcu, "MCU")
+        st.download_button("📥 Download MCU", out_bytes, "MCU_savage.xlsx",
+                           "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
